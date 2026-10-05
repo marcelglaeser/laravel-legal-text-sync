@@ -113,6 +113,17 @@ test('a failed delivery can be retried', function () {
     Queue::assertPushed(DeliverLegalTextVersion::class, fn ($job) => $job->delivery->is($delivery));
 });
 
+test('retrying the same failed delivery twice only queues one job', function () {
+    Queue::fake();
+
+    $delivery = Delivery::factory()->failed()->create();
+
+    expect($delivery->retry())->toBeTrue()
+        ->and(Delivery::find($delivery->id)?->retry())->toBeFalse();
+
+    Queue::assertPushed(DeliverLegalTextVersion::class, 1);
+});
+
 test('only failed deliveries can be retried', function () {
     Queue::fake();
 

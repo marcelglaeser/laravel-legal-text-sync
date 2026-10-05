@@ -36,9 +36,9 @@ new #[Title('Dashboard')] class extends Component {
 
         $this->authorize('retry', $delivery);
 
-        $delivery->retry();
-
-        Flux::toast(variant: 'success', text: __('Delivery to :shop queued again.', ['shop' => $delivery->shop->name]));
+        if ($delivery->retry()) {
+            Flux::toast(variant: 'success', text: __('Delivery to :shop queued again.', ['shop' => $delivery->shop->name]));
+        }
     }
 }; ?>
 

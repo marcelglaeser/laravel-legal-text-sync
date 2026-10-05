@@ -71,18 +71,25 @@ class Delivery extends Model
         ]);
     }
 
-    public function retry(): void
+    public function retry(): bool
     {
-        if ($this->status !== DeliveryStatus::Failed) {
-            return;
+        $reset = static::query()
+            ->whereKey($this->getKey())
+            ->where('status', DeliveryStatus::Failed)
+            ->update([
+                'status' => DeliveryStatus::Pending,
+                'last_error' => null,
+            ]);
+
+        if ($reset === 0) {
+            return false;
         }
 
-        $this->update([
-            'status' => DeliveryStatus::Pending,
-            'last_error' => null,
-        ]);
+        $this->refresh();
 
         DeliverLegalTextVersion::dispatch($this);
+
+        return true;
     }
 
     /**

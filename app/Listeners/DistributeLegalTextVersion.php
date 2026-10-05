@@ -9,6 +9,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 
 class DistributeLegalTextVersion implements ShouldQueue
 {
+    public int $tries = 3;
+
     public function handle(LegalTextVersionPublished $event): void
     {
         $version = $event->version;
