@@ -1,9 +1,9 @@
 # Legal Text Sync
 
-Ein kleines Laravel-Demo-Projekt: Onlinehändler pflegen ihre Rechtstexte (Impressum, AGB, Datenschutzerklärung, Widerrufsbelehrung) versioniert an einer Stelle. Jede veröffentlichte Version wird automatisch an alle Shops des Händlers verteilt – Shopify, JTL-Shop oder ein beliebiger Shop per signiertem Webhook. Partner können die aktuellen Texte über eine REST-API abrufen.
+Ein kleines Laravel-Demo-Projekt nach dem Vorbild eines Rechtstexte-Update-Service: Die Rechtsabteilung pflegt zentrale Vorlagen für Impressum, AGB, Datenschutzerklärung und Widerrufsbelehrung. Aus Vorlage und Stammdaten des Händlers entstehen dessen persönliche Rechtstexte. Ändert sich eine Vorlage (z. B. nach einer Gesetzesänderung), werden die Texte aller Händler neu erzeugt und automatisch an ihre Shops verteilt – Shopify, JTL-Shop oder ein beliebiger Shop per signiertem Webhook. Händler können optional verlangen, jede neue Fassung vorher freizugeben. Partner rufen die aktuellen Texte über eine REST-API ab.
 
 **Live:** _https://legal-text-sync.laravel.cloud_ (Platzhalter – wird nach dem Deployment ersetzt)
-Demo-Login: `demo@example.com` / `password` · API-Doku: [`/docs/api`](https://legal-text-sync.laravel.cloud/docs/api)
+Demo-Logins: Händler `demo@example.com` / `password`, Rechtsabteilung `admin@example.com` / `password` · API-Doku: [`/docs/api`](https://legal-text-sync.laravel.cloud/docs/api)
 
 ## Stack
 
@@ -19,13 +19,18 @@ Demo-Login: `demo@example.com` / `password` · API-Doku: [`/docs/api`](https://l
 
 ```bash
 composer setup
-php artisan db:seed
+php artisan migrate:fresh --seed
 composer run dev
 ```
 
-`composer setup` installiert alle Abhängigkeiten, legt die `.env` an, migriert die SQLite-Datenbank und baut die Assets. `composer run dev` startet Webserver, Queue-Worker, Vite und Log-Ausgabe gemeinsam. Danach unter <http://localhost:8000> mit `demo@example.com` / `password` anmelden.
+`composer setup` installiert alle Abhängigkeiten, legt die `.env` an, migriert die SQLite-Datenbank und baut die Assets. `composer run dev` startet Webserver, Queue-Worker, Vite und Log-Ausgabe gemeinsam. Danach unter <http://localhost:8000> anmelden.
 
-Der Seeder legt einen Demo-Händler mit drei Shops an. Einer davon nutzt den eingebauten **Mock-Shop**, der per `MOCK_SHOP_FAILURE_RATE` (Standard `0.3`) zufällig mit HTTP 503 antwortet. So sieht man Retries, Backoff und endgültige Fehler live im Dashboard.
+Der Seeder legt an:
+- einen Admin der Rechtsabteilung (`admin@example.com`) und veröffentlichte Vorlagen für alle vier Rechtstexte,
+- einen Demo-Händler (`demo@example.com`) mit Stammdaten, aktivierter Freigabe und drei Shops,
+- ein AGB-Update (Vorlage v2), das beim Händler auf Freigabe wartet.
+
+Einer der Shops nutzt den eingebauten **Mock-Shop**, der per `MOCK_SHOP_FAILURE_RATE` (Standard `0.3`) zufällig mit HTTP 503 antwortet. So sieht man Retries, Backoff und endgültige Fehler live im Dashboard.
 
 Qualitätschecks:
 
@@ -67,9 +72,17 @@ Die OpenAPI-Spezifikation wird aus dem Code erzeugt: UI unter `/docs/api`, JSON 
 ## Ablauf
 
 ```
-Händler veröffentlicht Version
-  └─ LegalTextVersion::publish()            atomar: nur wenn published_at noch NULL
-       └─ Event LegalTextVersionPublished
+Rechtsabteilung veröffentlicht Vorlage
+  └─ LegalTemplateVersion::publish()        atomar: nur wenn published_at noch NULL
+       └─ Event LegalTemplateVersionPublished
+            └─ Queued Listener GenerateLegalTextsForMerchants
+                 └─ pro Händler: Job GenerateLegalText
+                      └─ LegalTextGenerator: Vorlage + Stammdaten → neue LegalTextVersion
+                           ├─ ohne Freigabe: sofort publish()
+                           └─ mit Freigabe:  wartet, bis der Händler freigibt → publish()
+
+LegalTextVersion::publish()                 atomar, ebenso
+  └─ Event LegalTextVersionPublished
             └─ Queued Listener DistributeLegalTextVersion
                  └─ pro Shop: Delivery anlegen (unique shop + version)
                       └─ Job DeliverLegalTextVersion   5 Versuche, Backoff 10/30/60/120 s
@@ -78,12 +91,18 @@ Händler veröffentlicht Version
 
 ## Entscheidungen
 
-**Versionierung:** Ein `LegalText` pro Händler und Typ, darunter unveränderliche `LegalTextVersion`-Einträge mit fortlaufender Nummer. Speichern erzeugt immer eine neue Version, alte werden nie überschrieben. So bleibt nachvollziehbar, welcher Text wann galt, und genau das braucht man bei Abmahnungen. Unveränderter Inhalt erzeugt keine neue Version. „Aktuell“ ist die zuletzt veröffentlichte Version (`hasOne()->ofMany()`); Entwürfe bleiben unsichtbar, bis sie veröffentlicht werden.
+**Vorlagen statt Freitext:** Händler schreiben ihre Rechtstexte nicht selbst, dafür bezahlen sie ja den Dienstleister. Die Rechtsabteilung pflegt `LegalTemplateVersion`s mit Platzhaltern wie `{{ company_name }}`, der Händler liefert nur seine Stammdaten (`MerchantProfile`). Der `LegalTextGenerator` setzt beides zusammen. Eine neue Fassung entsteht, wenn sich die Vorlage **oder** die Stammdaten ändern. Bewusst einfach gehalten: `strtr` statt Template-Engine, ein `is_admin`-Flag mit Gate statt Rollensystem.
+
+**Versionierung:** Vorlagen und Händlertexte sind beide versioniert und unveränderlich. Jede `LegalTextVersion` verweist auf die Vorlagenversion, aus der sie entstand. So lässt sich bei einer Abmahnung belegen, welcher Händler wann welche Fassung live hatte. Unveränderter Inhalt erzeugt keine neue Version. „Aktuell“ ist jeweils die zuletzt veröffentlichte Version (`hasOne()->ofMany()`).
+
+**Optionale Freigabe:** Standardmäßig gehen Updates automatisch live, so wie man es von einem Update-Service erwartet. Händler, die jede Änderung sehen wollen, aktivieren im Profil „Updates freigeben“. Neue Fassungen warten dann, die Shops behalten bis zur Freigabe die bisherige Fassung. Die Regel gilt einheitlich für Vorlagen-Updates und Stammdatenänderungen. Freigeben lässt sich nur die neueste Fassung: Kommt ein weiteres Update, bevor der Händler reagiert, ist die ältere ausstehende Fassung überholt. Diese Regel steckt in der Policy (`LegalTextVersionPolicy::approve`).
+
+**Fan-out in zwei Stufen:** Eine Vorlagenänderung betrifft alle Händler und deren Shops. Statt alles in einem Job zu erledigen, erzeugt ein Job pro Händler den Text, und jede Veröffentlichung startet wiederum einen Job pro Shop. Fehler bleiben so auf einen Händler bzw. Shop begrenzt. Generierungsjobs für eine inzwischen überholte Vorlage brechen ab, damit eine verspätete Queue keine alte Fassung erzeugt.
 
 **Adapter pro Shoptyp:** Jedes Shopsystem spricht eine andere API. Deshalb gibt es ein schmales `ShopAdapter`-Interface mit einer Implementierung pro Typ. Die Zuordnung steckt im Enum (`ShopType::adapter()`), der Container löst den Adapter auf. Ein neuer Shoptyp bedeutet: ein Enum-Case und eine Klasse, sonst nichts. Shopify und JTL sind hier Mocks; der Generic-Webhook ist echt und signiert den Body mit HMAC-SHA256 (`X-Signature: sha256=…`, Vergleich mit `hash_equals`).
 
 **Idempotenz auf drei Ebenen:**
-1. *Veröffentlichen:* `publish()` setzt `published_at` per `UPDATE … WHERE published_at IS NULL`. Nur wer diese Zeile tatsächlich ändert, löst das Event aus – Doppelklicks und parallele Requests verteilen nichts doppelt.
+1. *Veröffentlichen* (Vorlage wie Händlertext): `publish()` setzt `published_at` per `UPDATE … WHERE published_at IS NULL`. Nur wer diese Zeile tatsächlich ändert, löst das Event aus – Doppelklicks und parallele Requests verteilen nichts doppelt.
 2. *Verteilen:* Der Unique-Index `(shop_id, legal_text_version_id)` auf `deliveries` plus `createOrFirst()` garantiert eine Zustellung pro Shop und Version, auch wenn der Listener doppelt läuft (Queues liefern *at least once*).
 3. *Zustellen:* Der Job überspringt bereits zugestellte Deliveries und schickt einen `Idempotency-Key` mit, damit der Shop wiederholte Requests erkennt.
 
@@ -96,7 +115,7 @@ Händler veröffentlicht Version
 - **Messenger → Queues:** Statt Message + Handler + Transport-Routing gibt es Jobs, die sich selbst beschreiben: `$tries`, `backoff()` und `failed()` stehen direkt an der Klasse. Events mit `ShouldQueue`-Listenern ersetzen asynchrone Event-Subscriber; Listener werden automatisch entdeckt.
 - **Doctrine → Eloquent:** Active Record statt Data Mapper. Domänenlogik wie `publish()` oder `retry()` liegt direkt am Model, Relationen sind Methoden, Casts übernehmen Enums und Verschlüsselung (`'secret' => 'encrypted'`). Migrationen schreibe ich von Hand, statt sie aus Entity-Diffs zu generieren.
 - **Twig → Livewire/Blade:** Statt Controller + Formular-Typ + Twig-Template steckt eine interaktive Seite in einer einzigen Livewire-Komponente; Polling (`wire:poll`) und Aktionen (`wire:click`) brauchen kein eigenes JavaScript. Formularlogik liegt in Livewire-Form-Objekten.
-- **Voter → Policies:** Eine Policy pro Model mit einer Methode pro Fähigkeit, automatisch über Namenskonventionen gefunden und per `$this->authorize('publish', $version)` geprüft.
+- **Voter → Policies und Gates:** Eine Policy pro Model mit einer Methode pro Fähigkeit, automatisch über Namenskonventionen gefunden und per `$this->authorize('approve', $version)` geprüft. Für modellunabhängige Rechte wie den Admin-Bereich reicht ein Gate (`can:manage-templates` als Route-Middleware).
 - **Services/DI-Konfiguration → Container ohne YAML:** Autowiring ist da, aber kaum Konfiguration nötig. Contextual Attributes wie `#[CurrentUser]` injizieren den eingeloggten Benutzer direkt in Controller-Methoden.
 
 ## Deployment auf Laravel Cloud
@@ -105,7 +124,7 @@ Händler veröffentlicht Version
 2. Im Environment eine **Laravel Serverless Postgres**-Datenbank anlegen und anhängen – die `DB_*`-Variablen setzt Cloud selbst.
 3. Am **App cluster** unter *Background processes* → *New background process* einen **Queue worker** (1 Prozess) hinzufügen. Hinweis: *Managed queues* nicht verwenden, die würden `QUEUE_CONNECTION=cloud` setzen; dieses Projekt nutzt bewusst den Database-Treiber.
 4. Umgebungsvariablen ergänzen: `QUEUE_CONNECTION=database`, `MOCK_SHOP_FAILURE_RATE=0.3`.
-5. Deploy-Befehl `php artisan migrate --force` (Standard) beibehalten, deployen und einmalig unter *Commands* `php artisan db:seed --force` ausführen.
+5. Deploy-Befehl `php artisan migrate --force` (Standard) beibehalten, deployen und einmalig unter *Commands* `php artisan db:seed --force` ausführen. Danach den Demo-Logins im Seeder neue Passwörter geben oder sie bewusst als öffentliche Demo-Zugänge stehen lassen.
 
 Scale-to-Zero kann aktiv bleiben: Cloud weckt Laravel-Umgebungen für Queue-Jobs auf. Ein Job, der beim Einschlafen noch läuft, wird allerdings abgebrochen und beim nächsten Versuch wiederholt.
 
@@ -113,14 +132,15 @@ Scale-to-Zero kann aktiv bleiben: Cloud weckt Laravel-Umgebungen für Queue-Jobs
 
 | Pfad | Inhalt |
 | --- | --- |
-| `app/Models` | `Shop`, `LegalText`, `LegalTextVersion`, `Delivery` |
+| `app/Models` | `LegalTemplateVersion`, `MerchantProfile`, `LegalText`, `LegalTextVersion`, `Shop`, `Delivery` |
 | `app/Enums` | `ShopType` (inkl. Adapter-Zuordnung), `LegalTextType`, `DeliveryStatus` |
-| `app/Events`, `app/Listeners`, `app/Jobs` | Veröffentlichen → Verteilen → Zustellen |
+| `app/Events`, `app/Listeners`, `app/Jobs` | Vorlage veröffentlichen → Texte erzeugen → verteilen → zustellen |
+| `app/Services/LegalTextGenerator.php` | Vorlage + Stammdaten → Händlertext, direkt live oder zur Freigabe |
 | `app/Services/ShopAdapters` | Interface und Adapter pro Shoptyp |
 | `app/Support/WebhookSignature.php` | HMAC-Signatur und -Prüfung |
 | `app/Http/Controllers/Api`, `app/Http/Resources` | Partner-API |
 | `app/Policies` | Mandantentrennung für Aktionen |
-| `resources/views/pages` | Livewire-Seiten (Dashboard, Shops, Rechtstexte, API-Tokens) |
+| `resources/views/pages` | Livewire-Seiten: Dashboard, Rechtstexte mit Freigabe, Stammdaten, Shops, API-Tokens, Vorlagen (Admin) |
 | `tests/Feature`, `tests/Unit` | Pest-Tests |
 
 ---
