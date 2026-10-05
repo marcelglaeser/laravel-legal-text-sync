@@ -1,12 +1,9 @@
 <?php
 
-use App\Enums\DeliveryStatus;
 use App\Enums\LegalTextType;
-use App\Models\LegalText;
-use App\Models\LegalTextVersion;
+use App\Models\LegalTemplateVersion;
 use Flux\Flux;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
@@ -20,24 +17,15 @@ new class extends Component {
     public function mount(LegalTextType $type): void
     {
         $this->type = $type;
-        $this->content = $this->legalText->latestVersion->content ?? '';
-    }
-
-    #[Computed]
-    public function legalText(): LegalText
-    {
-        return Auth::user()->legalText($this->type);
+        $this->content = LegalTemplateVersion::latestFor($type)->content ?? '';
     }
 
     #[Computed]
     public function versions(): Collection
     {
-        return $this->legalText->versions()
-            ->withCount([
-                'deliveries',
-                'deliveries as delivered_count' => fn ($query) => $query->where('status', DeliveryStatus::Delivered),
-                'deliveries as failed_count' => fn ($query) => $query->where('status', DeliveryStatus::Failed),
-            ])
+        return LegalTemplateVersion::query()
+            ->where('type', $this->type)
+            ->withCount('legalTextVersions')
             ->latest('version')
             ->get();
     }
@@ -46,21 +34,21 @@ new class extends Component {
     {
         $this->validate();
 
-        $version = $this->legalText->createVersion($this->content);
+        $version = LegalTemplateVersion::draft($this->type, $this->content);
 
         unset($this->versions);
 
-        Flux::toast(variant: 'success', text: __('Saved as version :version.', ['version' => $version->version]));
+        Flux::toast(variant: 'success', text: __('Saved as draft version :version.', ['version' => $version->version]));
     }
 
     public function publish(int $versionId): void
     {
-        $version = LegalTextVersion::findOrFail($versionId);
+        $version = LegalTemplateVersion::findOrFail($versionId);
 
-        $this->authorize('publish', $version);
+        abort_unless($version->isLatest(), 403);
 
         if ($version->publish()) {
-            Flux::toast(variant: 'success', text: __('Version :version published and queued for delivery.', ['version' => $version->version]));
+            Flux::toast(variant: 'success', text: __('Template version :version published. Merchant texts are being generated.', ['version' => $version->version]));
         }
 
         unset($this->versions);
@@ -68,25 +56,32 @@ new class extends Component {
 
     public function render()
     {
-        return $this->view()->title($this->type->label());
+        return $this->view()->title(__('Template: :type', ['type' => $this->type->label()]));
     }
 }; ?>
 
-<div class="flex flex-col gap-6" wire:poll.5s.visible="$refresh">
+<div class="flex flex-col gap-6" wire:poll.10s.visible>
     <div>
         <flux:breadcrumbs>
-            <flux:breadcrumbs.item :href="route('legal-texts.index')" wire:navigate>{{ __('Legal texts') }}</flux:breadcrumbs.item>
+            <flux:breadcrumbs.item :href="route('admin.templates.index')" wire:navigate>{{ __('Templates') }}</flux:breadcrumbs.item>
             <flux:breadcrumbs.item>{{ $type->label() }}</flux:breadcrumbs.item>
         </flux:breadcrumbs>
 
-        <flux:heading size="xl" level="1" class="mt-2">{{ $type->label() }}</flux:heading>
+        <flux:heading size="xl" level="1" class="mt-2">{{ __('Template: :type', ['type' => $type->label()]) }}</flux:heading>
     </div>
 
     <div class="grid gap-8 lg:grid-cols-5">
         <form wire:submit="save" class="space-y-4 lg:col-span-3">
-            <flux:textarea wire:model="content" :label="__('Content')" rows="18" />
+            <flux:textarea wire:model="content" :label="__('Template')" rows="18" class="font-mono" />
 
-            <flux:button type="submit" variant="primary" icon="document-plus">{{ __('Save as new version') }}</flux:button>
+            <flux:text size="sm">
+                {{ __('Placeholders:') }}
+                @foreach (\App\Models\MerchantProfile::PLACEHOLDERS as $placeholder)
+                    <code class="rounded bg-zinc-100 px-1 dark:bg-zinc-700">{{ \App\Models\MerchantProfile::placeholderTag($placeholder) }}</code>
+                @endforeach
+            </flux:text>
+
+            <flux:button type="submit" variant="primary" icon="document-plus">{{ __('Save as new draft') }}</flux:button>
         </form>
 
         <div class="space-y-4 lg:col-span-2">
@@ -99,10 +94,18 @@ new class extends Component {
 
                         @if ($version->isPublished())
                             <flux:badge color="green" size="sm">{{ __('Published') }}</flux:badge>
-                        @else
-                            <flux:button size="sm" variant="primary" icon="paper-airplane" wire:click="publish({{ $version->id }})">
+                        @elseif ($loop->first)
+                            <flux:button
+                                size="sm"
+                                variant="primary"
+                                icon="paper-airplane"
+                                wire:click="publish({{ $version->id }})"
+                                wire:confirm="{{ __('Publish this template? Texts for all merchants will be regenerated.') }}"
+                            >
                                 {{ __('Publish') }}
                             </flux:button>
+                        @else
+                            <flux:badge size="sm">{{ __('Superseded draft') }}</flux:badge>
                         @endif
                     </div>
 
@@ -113,17 +116,12 @@ new class extends Component {
                         @endif
                     </flux:text>
 
-                    @if ($version->deliveries_count > 0)
-                        <flux:text size="sm">
-                            {{ __(':delivered of :total shops delivered', ['delivered' => $version->delivered_count, 'total' => $version->deliveries_count]) }}
-                            @if ($version->failed_count > 0)
-                                · <a href="{{ route('dashboard') }}" wire:navigate class="text-red-600 underline">{{ __(':count failed', ['count' => $version->failed_count]) }}</a>
-                            @endif
-                        </flux:text>
+                    @if ($version->isPublished())
+                        <flux:text size="sm">{{ __(':count merchant texts generated', ['count' => $version->legal_text_versions_count]) }}</flux:text>
                     @endif
                 </flux:card>
             @empty
-                <flux:text>{{ __('No versions yet. Save the text to create version 1.') }}</flux:text>
+                <flux:text>{{ __('No versions yet. Save the template to create version 1.') }}</flux:text>
             @endforelse
         </div>
     </div>

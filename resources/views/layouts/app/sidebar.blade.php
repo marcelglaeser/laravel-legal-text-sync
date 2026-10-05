@@ -21,7 +21,18 @@
                     <flux:sidebar.item icon="building-storefront" :href="route('shops.index')" :current="request()->routeIs('shops.*')" wire:navigate>
                         {{ __('Shops') }}
                     </flux:sidebar.item>
+                    <flux:sidebar.item icon="building-office" :href="route('company-profile.edit')" :current="request()->routeIs('company-profile.*')" wire:navigate>
+                        {{ __('Company profile') }}
+                    </flux:sidebar.item>
                 </flux:sidebar.group>
+
+                @can('manage-templates')
+                    <flux:sidebar.group :heading="__('Legal department')" class="grid">
+                        <flux:sidebar.item icon="scale" :href="route('admin.templates.index')" :current="request()->routeIs('admin.templates.*')" wire:navigate>
+                            {{ __('Templates') }}
+                        </flux:sidebar.item>
+                    </flux:sidebar.group>
+                @endcan
             </flux:sidebar.nav>
 
             <flux:spacer />
