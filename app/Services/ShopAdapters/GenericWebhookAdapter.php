@@ -6,6 +6,7 @@ use App\Models\Delivery;
 use App\Models\Shop;
 use App\Support\PublicEndpoint;
 use App\Support\WebhookSignature;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 
 class GenericWebhookAdapter implements ShopAdapter
@@ -41,6 +42,10 @@ class GenericWebhookAdapter implements ShopAdapter
             }
         }
 
-        $request->post($shop->endpoint_url)->throw();
+        $response = $request->post($shop->endpoint_url);
+
+        if (! $response->successful()) {
+            throw new RequestException($response);
+        }
     }
 }

@@ -63,6 +63,21 @@ test('the built-in mock shop is reachable although it runs on the app host', fun
     Http::assertSent(fn (Request $request) => $request->url() === route('mock-shop', $shop));
 });
 
+test('a redirect is not treated as a successful delivery', function () {
+    Http::fake(['*' => Http::response('', 302, ['Location' => 'http://169.254.169.254/'])]);
+
+    $delivery = Delivery::factory()->create();
+
+    expect(fn () => (new DeliverLegalTextVersion($delivery))->handle())
+        ->toThrow(RequestException::class);
+
+    expect($delivery->refresh())
+        ->status->toBe(DeliveryStatus::Pending)
+        ->last_error->toContain('302');
+
+    Http::assertSentCount(1);
+});
+
 test('delivers to shopify and jtl through their mock adapters without http calls', function (string $type) {
     $delivery = Delivery::factory()->for(Shop::factory()->state(['type' => $type]))->create();
 
