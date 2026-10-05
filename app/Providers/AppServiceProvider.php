@@ -30,6 +30,8 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->configureApiDocs();
+
+        Gate::define('manage-templates', fn (User $user): bool => $user->is_admin);
     }
 
     /**

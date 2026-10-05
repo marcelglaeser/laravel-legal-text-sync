@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\Event;
 test('every change creates a new version and keeps the old ones', function () {
     $legalText = User::factory()->create()->legalText(LegalTextType::Terms);
 
-    $first = $legalText->createVersion('AGB v1');
-    $second = $legalText->createVersion('AGB v2');
+    $first = $legalText->createVersion('AGB v1', publishedTemplate());
+    $second = $legalText->createVersion('AGB v2', publishedTemplate());
 
     expect($first->version)->toBe(1)
         ->and($second->version)->toBe(2)
@@ -20,8 +20,8 @@ test('every change creates a new version and keeps the old ones', function () {
 test('saving unchanged content does not create a new version', function () {
     $legalText = User::factory()->create()->legalText(LegalTextType::Terms);
 
-    $first = $legalText->createVersion('AGB v1');
-    $same = $legalText->createVersion('AGB v1');
+    $first = $legalText->createVersion('AGB v1', publishedTemplate());
+    $same = $legalText->createVersion('AGB v1', publishedTemplate());
 
     expect($same->is($first))->toBeTrue()
         ->and($legalText->versions()->count())->toBe(1);
@@ -30,8 +30,8 @@ test('saving unchanged content does not create a new version', function () {
 test('versions are numbered per legal text', function () {
     $user = User::factory()->create();
 
-    $user->legalText(LegalTextType::Terms)->createVersion('AGB');
-    $imprint = $user->legalText(LegalTextType::Imprint)->createVersion('Impressum');
+    $user->legalText(LegalTextType::Terms)->createVersion('AGB', publishedTemplate());
+    $imprint = $user->legalText(LegalTextType::Imprint)->createVersion('Impressum', publishedTemplate());
 
     expect($imprint->version)->toBe(1);
 });
@@ -39,7 +39,7 @@ test('versions are numbered per legal text', function () {
 test('publishing a version dispatches the published event', function () {
     Event::fake([LegalTextVersionPublished::class]);
 
-    $version = User::factory()->create()->legalText(LegalTextType::Privacy)->createVersion('Datenschutz');
+    $version = User::factory()->create()->legalText(LegalTextType::Privacy)->createVersion('Datenschutz', publishedTemplate());
 
     expect($version->publish())->toBeTrue()
         ->and($version->isPublished())->toBeTrue();
@@ -50,7 +50,7 @@ test('publishing a version dispatches the published event', function () {
 test('publishing the same version twice only dispatches the event once', function () {
     Event::fake([LegalTextVersionPublished::class]);
 
-    $version = User::factory()->create()->legalText(LegalTextType::Privacy)->createVersion('Datenschutz');
+    $version = User::factory()->create()->legalText(LegalTextType::Privacy)->createVersion('Datenschutz', publishedTemplate());
 
     $version->publish();
 
@@ -64,10 +64,10 @@ test('the current version is the latest published one, drafts are ignored', func
 
     $legalText = User::factory()->create()->legalText(LegalTextType::Withdrawal);
 
-    $legalText->createVersion('v1')->publish();
+    $legalText->createVersion('v1', publishedTemplate())->publish();
     $this->travel(1)->minute();
-    $legalText->createVersion('v2')->publish();
-    $legalText->createVersion('v3 draft');
+    $legalText->createVersion('v2', publishedTemplate())->publish();
+    $legalText->createVersion('v3 draft', publishedTemplate());
 
     expect($legalText->currentVersion?->content)->toBe('v2')
         ->and($legalText->latestVersion?->content)->toBe('v3 draft');

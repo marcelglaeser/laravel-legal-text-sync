@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Queue;
 
 function publishedVersionFor(User $user): LegalTextVersion
 {
-    $version = $user->legalText(LegalTextType::Imprint)->createVersion('Impressum');
+    $version = $user->legalText(LegalTextType::Imprint)->createVersion('Impressum', publishedTemplate());
     $version->forceFill(['published_at' => now()])->save();
 
     return $version;
@@ -23,7 +23,7 @@ test('publishing queues the distribution listener', function () {
     Queue::fake();
 
     $user = User::factory()->create();
-    $user->legalText(LegalTextType::Imprint)->createVersion('Impressum')->publish();
+    $user->legalText(LegalTextType::Imprint)->createVersion('Impressum', publishedTemplate())->publish();
 
     Queue::assertPushed(CallQueuedListener::class, fn (CallQueuedListener $job) => $job->class === DistributeLegalTextVersion::class);
 });
@@ -75,7 +75,7 @@ test('shops added later receive the next published version', function () {
     $listener->handle(new LegalTextVersionPublished(publishedVersionFor($user)));
     Shop::factory()->for($user)->create();
 
-    $next = $user->legalText(LegalTextType::Imprint)->createVersion('Impressum v2');
+    $next = $user->legalText(LegalTextType::Imprint)->createVersion('Impressum v2', publishedTemplate());
     $next->forceFill(['published_at' => now()])->save();
     $listener->handle(new LegalTextVersionPublished($next));
 

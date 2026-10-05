@@ -7,8 +7,9 @@ use App\Models\User;
 
 class LegalTextVersionPolicy
 {
-    public function publish(User $user, LegalTextVersion $version): bool
+    public function approve(User $user, LegalTextVersion $version): bool
     {
-        return $user->id === $version->legalText->user_id;
+        return $user->id === $version->legalText->user_id
+            && $version->isAwaitingApproval();
     }
 }

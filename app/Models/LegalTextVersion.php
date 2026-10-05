@@ -14,8 +14,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property-read LegalText $legalText
+ * @property-read LegalTemplateVersion $legalTemplateVersion
  */
-#[Fillable(['version', 'content'])]
+#[Fillable(['legal_template_version_id', 'version', 'content'])]
 class LegalTextVersion extends Model
 {
     /** @use HasFactory<LegalTextVersionFactory> */
@@ -30,6 +31,14 @@ class LegalTextVersion extends Model
     }
 
     /**
+     * @return BelongsTo<LegalTemplateVersion, $this>
+     */
+    public function legalTemplateVersion(): BelongsTo
+    {
+        return $this->belongsTo(LegalTemplateVersion::class);
+    }
+
+    /**
      * @return HasMany<Delivery, $this>
      */
     public function deliveries(): HasMany
@@ -40,6 +49,19 @@ class LegalTextVersion extends Model
     public function isPublished(): bool
     {
         return $this->published_at !== null;
+    }
+
+    public function isLatest(): bool
+    {
+        return ! static::query()
+            ->where('legal_text_id', $this->legal_text_id)
+            ->where('version', '>', $this->version)
+            ->exists();
+    }
+
+    public function isAwaitingApproval(): bool
+    {
+        return ! $this->isPublished() && $this->isLatest();
     }
 
     public function publish(): bool

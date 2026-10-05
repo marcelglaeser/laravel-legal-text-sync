@@ -7,7 +7,7 @@ use Laravel\Sanctum\Sanctum;
 
 function publish(LegalText $legalText, string $content): void
 {
-    $legalText->createVersion($content)->forceFill(['published_at' => now()])->save();
+    $legalText->createVersion($content, publishedTemplate())->forceFill(['published_at' => now()])->save();
 }
 
 test('requires a sanctum token', function (string $uri) {
@@ -23,7 +23,7 @@ test('lists the current published legal texts of the merchant', function () {
     publish($user->legalText(LegalTextType::Imprint), 'Impressum v1');
     $this->travel(1)->minute();
     publish($user->legalText(LegalTextType::Imprint), 'Impressum v2');
-    $user->legalText(LegalTextType::Terms)->createVersion('AGB draft');
+    $user->legalText(LegalTextType::Terms)->createVersion('AGB draft', publishedTemplate());
     publish(User::factory()->create()->legalText(LegalTextType::Privacy), 'Foreign');
 
     Sanctum::actingAs($user);
@@ -50,7 +50,7 @@ test('shows a single current legal text', function () {
 
 test('returns 404 for unpublished or unknown legal text types', function (string $type) {
     $user = User::factory()->create();
-    $user->legalText(LegalTextType::Terms)->createVersion('AGB draft');
+    $user->legalText(LegalTextType::Terms)->createVersion('AGB draft', publishedTemplate());
 
     Sanctum::actingAs($user);
 
@@ -62,7 +62,7 @@ test('returns the published version history, newest first', function () {
     $legalText = $user->legalText(LegalTextType::Terms);
     publish($legalText, 'AGB v1');
     publish($legalText, 'AGB v2');
-    $legalText->createVersion('AGB v3 draft');
+    $legalText->createVersion('AGB v3 draft', publishedTemplate());
 
     Sanctum::actingAs($user);
 

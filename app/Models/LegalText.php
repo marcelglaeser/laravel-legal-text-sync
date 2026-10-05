@@ -56,7 +56,7 @@ class LegalText extends Model
         );
     }
 
-    public function createVersion(string $content): LegalTextVersion
+    public function createVersion(string $content, LegalTemplateVersion $template): LegalTextVersion
     {
         $latest = $this->latestVersion()->first();
 
@@ -65,6 +65,7 @@ class LegalText extends Model
         }
 
         $version = $this->versions()->create([
+            'legal_template_version_id' => $template->id,
             'version' => ($latest->version ?? 0) + 1,
             'content' => $content,
         ]);
