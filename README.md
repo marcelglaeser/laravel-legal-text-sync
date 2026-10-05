@@ -108,6 +108,12 @@ LegalTextVersion::publish()                 atomar, ebenso
 
 **Warum Queues:** Externe Shops sind langsam oder zeitweise down. Im Request würde ein einziger hängender Shop das Veröffentlichen blockieren, und ein Fehler wäre schwer zu wiederholen. Mit einem Job pro Shop sind die Shops voneinander isoliert, Laravel übernimmt Retries mit Backoff, und nach dem letzten Versuch landet der Job in `failed_jobs`. Die Delivery steht dann auf `failed` und lässt sich im Dashboard per Klick neu senden. Der Database-Treiber reicht für dieses Volumen und braucht keine zusätzliche Infrastruktur.
 
+**SSRF-Schutz:** Händler geben eine beliebige Webhook-URL an, die der Server aufruft. Ohne Schutz könnte man so interne Dienste, Datenbanken oder Cloud-Metadaten (`169.254.169.254`) erreichen. Deshalb müssen alle aufgelösten Adressen global erreichbar sein (`FILTER_FLAG_GLOBAL_RANGE`). Geprüft wird beim Speichern **und** vor jeder Zustellung. Die Verbindung wird per `CURLOPT_RESOLVE` auf die geprüfte IP festgelegt, Redirects sind aus. So hilft auch DNS-Rebinding nicht weiter. Ein unsicheres Ziel ist ein dauerhafter Fehler: Die Zustellung scheitert sofort, statt fünfmal wiederholt zu werden. Einzige Ausnahme ist der von der App selbst erzeugte Mock-Shop-Endpunkt.
+
+**Neue Shops:** Ein neu angelegter Shop bekommt sofort alle aktuell live geschalteten Rechtstexte, nicht erst beim nächsten Update. Dafür nutzt er dasselbe idempotente `Shop::deliver()` wie die normale Verteilung.
+
+**Keine E-Mail-Verifizierung:** Die öffentliche Demo hat keinen Mailversand. Statt einer `verified`-Middleware, die nichts schützt, ist die Verifizierung bewusst komplett entfernt. Für den Produktivbetrieb würde man sie mit echtem Mail-Transport wieder aktivieren (`MustVerifyEmail`, Fortify-Feature, `verified`-Middleware).
+
 **Mandantentrennung:** Händler = User. Alle Abfragen laufen über die Relationen des eingeloggten Users (`$user->shops()`, `$user->legalTexts()`); Aktionen mit IDs vom Client prüfen zusätzlich Policies. Für mehrere Benutzer pro Händler wäre der nächste Schritt ein Team-Modell.
 
 ## Von Symfony zu Laravel
