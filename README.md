@@ -2,8 +2,7 @@
 
 Ein kleines Laravel-Demo-Projekt nach dem Vorbild eines Rechtstexte-Update-Service: Die Rechtsabteilung pflegt zentrale Vorlagen für Impressum, AGB, Datenschutzerklärung und Widerrufsbelehrung. Aus Vorlage und Stammdaten des Händlers entstehen dessen persönliche Rechtstexte. Ändert sich eine Vorlage (z. B. nach einer Gesetzesänderung), werden die Texte aller Händler neu erzeugt und automatisch an ihre Shops verteilt – Shopify, JTL-Shop oder ein beliebiger Shop per signiertem Webhook. Händler können optional verlangen, jede neue Fassung vorher freizugeben. Partner rufen die aktuellen Texte über eine REST-API ab.
 
-**Live:** _https://legal-text-sync.laravel.cloud_ (Platzhalter – wird nach dem Deployment ersetzt)
-Demo-Logins: Händler `demo@example.com` / `password`, Rechtsabteilung `admin@example.com` / `password` · API-Doku: [`/docs/api`](https://legal-text-sync.laravel.cloud/docs/api)
+Lokal in zwei Minuten startklar (siehe unten). Demo-Logins aus dem Seeder: Händler `demo@example.com` / `password`, Rechtsabteilung `admin@example.com` / `password`. API-Doku unter `/docs/api`.
 
 ## Stack
 
@@ -13,7 +12,7 @@ Demo-Logins: Händler `demo@example.com` / `password`, Rechtsabteilung `admin@ex
 - Sanctum für die Partner-API, OpenAPI-Doku via [Scramble](https://scramble.dedoc.co)
 - Pest, Larastan (Level 8), Pint
 - GitHub Actions: Pint, Larastan und Pest (gegen SQLite **und** PostgreSQL) bei jedem Push
-- SQLite lokal, PostgreSQL auf Laravel Cloud
+- SQLite lokal, PostgreSQL-kompatibel (die CI testet gegen beide)
 
 ## Lokal starten
 
@@ -112,7 +111,7 @@ LegalTextVersion::publish()                 atomar, ebenso
 
 **Neue Shops:** Ein neu angelegter Shop bekommt sofort alle aktuell live geschalteten Rechtstexte, nicht erst beim nächsten Update. Dafür nutzt er dasselbe idempotente `Shop::deliver()` wie die normale Verteilung.
 
-**Keine E-Mail-Verifizierung:** Die öffentliche Demo hat keinen Mailversand. Statt einer `verified`-Middleware, die nichts schützt, ist die Verifizierung bewusst komplett entfernt. Für den Produktivbetrieb würde man sie mit echtem Mail-Transport wieder aktivieren (`MustVerifyEmail`, Fortify-Feature, `verified`-Middleware).
+**Keine E-Mail-Verifizierung:** Für eine Demo ohne Mailversand bringt sie nichts. Statt einer `verified`-Middleware, die nichts schützt, ist die Verifizierung bewusst komplett entfernt. Für den Produktivbetrieb würde man sie mit echtem Mail-Transport wieder aktivieren (`MustVerifyEmail`, Fortify-Feature, `verified`-Middleware).
 
 **Mandantentrennung:** Händler = User. Alle Abfragen laufen über die Relationen des eingeloggten Users (`$user->shops()`, `$user->legalTexts()`); Aktionen mit IDs vom Client prüfen zusätzlich Policies. Für mehrere Benutzer pro Händler wäre der nächste Schritt ein Team-Modell.
 
@@ -123,16 +122,6 @@ LegalTextVersion::publish()                 atomar, ebenso
 - **Twig → Livewire/Blade:** Statt Controller + Formular-Typ + Twig-Template steckt eine interaktive Seite in einer einzigen Livewire-Komponente; Polling (`wire:poll`) und Aktionen (`wire:click`) brauchen kein eigenes JavaScript. Formularlogik liegt in Livewire-Form-Objekten.
 - **Voter → Policies und Gates:** Eine Policy pro Model mit einer Methode pro Fähigkeit, automatisch über Namenskonventionen gefunden und per `$this->authorize('approve', $version)` geprüft. Für modellunabhängige Rechte wie den Admin-Bereich reicht ein Gate (`can:manage-templates` als Route-Middleware).
 - **Services/DI-Konfiguration → Container ohne YAML:** Autowiring ist da, aber kaum Konfiguration nötig. Contextual Attributes wie `#[CurrentUser]` injizieren den eingeloggten Benutzer direkt in Controller-Methoden.
-
-## Deployment auf Laravel Cloud
-
-1. Repository in Laravel Cloud verbinden, neue Application anlegen (Region Frankfurt).
-2. Im Environment eine **Laravel Serverless Postgres**-Datenbank anlegen und anhängen – die `DB_*`-Variablen setzt Cloud selbst.
-3. Am **App cluster** unter *Background processes* → *New background process* einen **Queue worker** (1 Prozess) hinzufügen. Hinweis: *Managed queues* nicht verwenden, die würden `QUEUE_CONNECTION=cloud` setzen; dieses Projekt nutzt bewusst den Database-Treiber.
-4. Umgebungsvariablen ergänzen: `QUEUE_CONNECTION=database`, `MOCK_SHOP_FAILURE_RATE=0.3`.
-5. Deploy-Befehl `php artisan migrate --force` (Standard) beibehalten, deployen und einmalig unter *Commands* `php artisan db:seed --force` ausführen. Danach den Demo-Logins im Seeder neue Passwörter geben oder sie bewusst als öffentliche Demo-Zugänge stehen lassen.
-
-Scale-to-Zero kann aktiv bleiben: Cloud weckt Laravel-Umgebungen für Queue-Jobs auf. Ein Job, der beim Einschlafen noch läuft, wird allerdings abgebrochen und beim nächsten Versuch wiederholt.
 
 ## Projektstruktur
 
