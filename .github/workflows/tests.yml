@@ -1,9 +1,7 @@
-name: tests
+name: CI
 
 on:
   push:
-    branches:
-      - main
   pull_request:
 
 permissions:
@@ -12,6 +10,20 @@ permissions:
 jobs:
   ci:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: testing
+          POSTGRES_PASSWORD: secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout code
@@ -31,8 +43,24 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Setup Application
+      - name: Setup application
         run: composer setup
 
-      - name: Run CI Checks
-        run: composer ci:check
+      - name: Pint
+        run: composer lint:check
+
+      - name: Larastan
+        run: composer types:check
+
+      - name: Pest (SQLite)
+        run: php artisan test
+
+      - name: Pest (PostgreSQL)
+        run: php artisan test
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: testing
+          DB_USERNAME: postgres
+          DB_PASSWORD: secret
