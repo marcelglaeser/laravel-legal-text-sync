@@ -13,14 +13,14 @@ test('a merchant can add a shop', function () {
         ->call('create')
         ->set('form.name', 'Mein JTL-Shop')
         ->set('form.type', ShopType::Jtl->value)
-        ->set('form.endpointUrl', 'https://shop.example.com')
+        ->set('form.endpointUrl', 'https://93.184.215.14')
         ->call('save')
         ->assertHasNoErrors();
 
     expect($user->shops()->sole())
         ->name->toBe('Mein JTL-Shop')
         ->type->toBe(ShopType::Jtl)
-        ->endpoint_url->toBe('https://shop.example.com')
+        ->endpoint_url->toBe('https://93.184.215.14')
         ->secret->toHaveLength(40);
 });
 
@@ -49,6 +49,23 @@ test('validates the shop form', function () {
         ->call('save')
         ->assertHasErrors(['form.name', 'form.endpointUrl', 'form.secret']);
 });
+
+test('rejects endpoints in internal networks', function (string $url) {
+    Livewire::actingAs(User::factory()->create())
+        ->test('pages::shops.index')
+        ->call('create')
+        ->set('form.name', 'Böser Shop')
+        ->set('form.endpointUrl', $url)
+        ->call('save')
+        ->assertHasErrors(['form.endpointUrl']);
+
+    expect(Shop::count())->toBe(0);
+})->with([
+    'http://127.0.0.1:6379',
+    'http://localhost/api/mock-shop/1',
+    'http://169.254.169.254/latest/meta-data',
+    'http://10.0.0.5/hook',
+]);
 
 test('editing keeps the secret when left empty', function () {
     $user = User::factory()->create();

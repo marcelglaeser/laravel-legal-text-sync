@@ -37,6 +37,11 @@ class Shop extends Model
         return $this->hasMany(Delivery::class);
     }
 
+    public function usesMockEndpoint(): bool
+    {
+        return $this->exists && $this->endpoint_url === route('mock-shop', $this);
+    }
+
     /**
      * @return array<string, string>
      */

@@ -4,6 +4,7 @@ namespace App\Services\ShopAdapters;
 
 use App\Models\Delivery;
 use App\Models\Shop;
+use App\Support\PublicEndpoint;
 use App\Support\WebhookSignature;
 use Illuminate\Support\Facades\Http;
 
@@ -24,13 +25,22 @@ class GenericWebhookAdapter implements ShopAdapter
             'published_at' => $version->published_at?->toIso8601String(),
         ], JSON_THROW_ON_ERROR);
 
-        Http::timeout(10)
+        $request = Http::timeout(10)
+            ->withoutRedirecting()
             ->withHeaders([
                 WebhookSignature::HEADER => WebhookSignature::sign($body, $shop->secret),
                 'Idempotency-Key' => "delivery-{$delivery->id}",
             ])
-            ->withBody($body)
-            ->post($shop->endpoint_url)
-            ->throw();
+            ->withBody($body);
+
+        if (! $shop->usesMockEndpoint()) {
+            $endpoint = PublicEndpoint::resolve($shop->endpoint_url);
+
+            if (! $endpoint->isIpLiteral()) {
+                $request->withOptions(['curl' => [CURLOPT_RESOLVE => [$endpoint->curlResolveEntry()]]]);
+            }
+        }
+
+        $request->post($shop->endpoint_url)->throw();
     }
 }

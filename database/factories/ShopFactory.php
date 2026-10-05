@@ -19,7 +19,7 @@ class ShopFactory extends Factory
             'user_id' => User::factory(),
             'name' => fake()->company(),
             'type' => ShopType::GenericWebhook,
-            'endpoint_url' => fake()->url(),
+            'endpoint_url' => 'https://93.184.215.14/legal-texts',
             'secret' => Str::random(40),
         ];
     }

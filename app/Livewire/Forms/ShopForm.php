@@ -5,6 +5,7 @@ namespace App\Livewire\Forms;
 use App\Enums\ShopType;
 use App\Models\Shop;
 use App\Models\User;
+use App\Rules\PublicUrl;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Form;
@@ -29,7 +30,7 @@ class ShopForm extends Form
         $this->name = $shop->name;
         $this->type = $shop->type->value;
         $this->endpointUrl = $shop->endpoint_url;
-        $this->useMockEndpoint = $shop->endpoint_url === route('mock-shop', $shop);
+        $this->useMockEndpoint = $shop->usesMockEndpoint();
         $this->secret = '';
     }
 
@@ -75,7 +76,7 @@ class ShopForm extends Form
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::enum(ShopType::class)],
             'useMockEndpoint' => ['boolean'],
-            'endpointUrl' => ['exclude_if:useMockEndpoint,true', 'required', 'url:https,http', 'max:2048'],
+            'endpointUrl' => ['exclude_if:useMockEndpoint,true', 'required', 'url:https,http', 'max:2048', new PublicUrl],
             'secret' => [$this->shop === null ? 'required' : 'nullable', 'string', 'min:16', 'max:255'],
         ];
     }

@@ -17,10 +17,10 @@ beforeEach(function () {
 });
 
 test('delivers to a generic webhook with a valid hmac signature', function () {
-    Http::fake(['https://shop.example/*' => Http::response(['received' => true])]);
+    Http::fake(['https://93.184.215.14/*' => Http::response(['received' => true])]);
 
     $delivery = Delivery::factory()
-        ->for(Shop::factory()->state(['endpoint_url' => 'https://shop.example/legal', 'secret' => 'shop-secret']))
+        ->for(Shop::factory()->state(['endpoint_url' => 'https://93.184.215.14/legal', 'secret' => 'shop-secret']))
         ->create();
 
     DeliverLegalTextVersion::dispatchSync($delivery);
@@ -30,11 +30,41 @@ test('delivers to a generic webhook with a valid hmac signature', function () {
         ->attempts->toBe(1)
         ->delivered_at->not->toBeNull();
 
-    Http::assertSent(fn (Request $request) => $request->url() === 'https://shop.example/legal'
+    Http::assertSent(fn (Request $request) => $request->url() === 'https://93.184.215.14/legal'
         && WebhookSignature::verify($request->body(), 'shop-secret', $request->header(WebhookSignature::HEADER)[0] ?? null)
         && $request['version'] === $delivery->legalTextVersion->version
         && $request['content'] === $delivery->legalTextVersion->content
         && $request->hasHeader('Idempotency-Key', "delivery-{$delivery->id}"));
+});
+
+test('an endpoint that now points to an internal address fails immediately without a request', function () {
+    $delivery = Delivery::factory()
+        ->for(Shop::factory()->state(['endpoint_url' => 'http://localhost:6379/hook']))
+        ->create();
+
+    DeliverLegalTextVersion::dispatchSync($delivery);
+
+    expect($delivery->refresh())
+        ->status->toBe(DeliveryStatus::Failed)
+        ->attempts->toBe(1)
+        ->last_error->toContain('non-public');
+
+    Http::assertNothingSent();
+});
+
+test('the built-in mock shop is reachable although it runs on the app host', function () {
+    config(['services.mock_shop.failure_rate' => 0.0]);
+    Http::fake();
+
+    $shop = Shop::factory()->create();
+    $shop->update(['endpoint_url' => route('mock-shop', $shop)]);
+    $delivery = Delivery::factory()->for($shop)->create();
+
+    DeliverLegalTextVersion::dispatchSync($delivery);
+
+    expect($delivery->refresh()->status)->toBe(DeliveryStatus::Delivered);
+
+    Http::assertSent(fn (Request $request) => $request->url() === route('mock-shop', $shop));
 });
 
 test('delivers to shopify and jtl through their mock adapters without http calls', function (string $type) {

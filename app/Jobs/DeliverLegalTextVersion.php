@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\DeliveryStatus;
+use App\Exceptions\UnsafeEndpointException;
 use App\Models\Delivery;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -41,6 +42,10 @@ class DeliverLegalTextVersion implements ShouldQueue
 
         try {
             $adapter->deliver($shop, $this->delivery);
+        } catch (UnsafeEndpointException $exception) {
+            $this->fail($exception);
+
+            return;
         } catch (Throwable $exception) {
             $this->delivery->recordError($exception->getMessage());
 
