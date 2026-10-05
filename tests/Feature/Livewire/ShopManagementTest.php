@@ -1,8 +1,13 @@
 <?php
 
+use App\Enums\LegalTextType;
 use App\Enums\ShopType;
+use App\Jobs\DeliverLegalTextVersion;
+use App\Models\MerchantProfile;
 use App\Models\Shop;
 use App\Models\User;
+use App\Services\LegalTextGenerator;
+use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
 
 test('a merchant can add a shop', function () {
@@ -22,6 +27,54 @@ test('a merchant can add a shop', function () {
         ->type->toBe(ShopType::Jtl)
         ->endpoint_url->toBe('https://93.184.215.14')
         ->secret->toHaveLength(40);
+});
+
+test('a new shop immediately receives the legal texts that are currently live', function () {
+    Queue::fake();
+
+    $profile = MerchantProfile::factory()->create();
+    $generator = app(LegalTextGenerator::class);
+    $generator->generate($profile, publishedTemplate(LegalTextType::Imprint, 'Impressum v1 {{ company_name }}'));
+    $this->travel(1)->minute();
+    $live = $generator->generate($profile, publishedTemplate(LegalTextType::Imprint, 'Impressum v2 {{ company_name }}'));
+    $profile->update(['requires_approval' => true]);
+    $generator->generate($profile, publishedTemplate(LegalTextType::Terms));
+    Queue::fake();
+
+    Livewire::actingAs($profile->user)
+        ->test('pages::shops.index')
+        ->call('create')
+        ->set('form.name', 'Neuer Shop')
+        ->set('form.type', ShopType::Shopify->value)
+        ->set('form.endpointUrl', 'https://93.184.215.14')
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $shop = $profile->user->shops()->sole();
+
+    expect($shop->deliveries()->pluck('legal_text_version_id')->all())->toBe([$live->id]);
+
+    Queue::assertPushed(DeliverLegalTextVersion::class, 1);
+});
+
+test('editing a shop does not deliver again', function () {
+    Queue::fake();
+
+    $profile = MerchantProfile::factory()->create();
+    app(LegalTextGenerator::class)->generate($profile, publishedTemplate());
+    $shop = Shop::factory()->for($profile->user)->create();
+    $shop->deliverCurrentLegalTexts();
+    Queue::fake();
+
+    Livewire::actingAs($profile->user)
+        ->test('pages::shops.index')
+        ->call('edit', $shop->id)
+        ->set('form.name', 'Umbenannt')
+        ->call('save');
+
+    expect($shop->deliveries()->count())->toBe(1);
+
+    Queue::assertNothingPushed();
 });
 
 test('the built-in mock shop can be used as endpoint', function () {

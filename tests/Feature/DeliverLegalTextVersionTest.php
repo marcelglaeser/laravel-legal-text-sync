@@ -12,10 +12,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 
-beforeEach(function () {
-    Http::preventStrayRequests();
-});
-
 test('delivers to a generic webhook with a valid hmac signature', function () {
     Http::fake(['https://93.184.215.14/*' => Http::response(['received' => true])]);
 

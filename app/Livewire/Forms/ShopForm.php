@@ -45,6 +45,7 @@ class ShopForm extends Form
         $this->validate();
 
         $shop = $this->shop ?? $user->shops()->make();
+        $isNew = ! $shop->exists;
 
         $shop->fill([
             'name' => $this->name,
@@ -60,6 +61,10 @@ class ShopForm extends Form
 
         if ($this->useMockEndpoint) {
             $shop->update(['endpoint_url' => route('mock-shop', $shop)]);
+        }
+
+        if ($isNew) {
+            $shop->deliverCurrentLegalTexts();
         }
 
         $this->reset();
