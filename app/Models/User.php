@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Enums\LegalTextType;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -14,6 +17,7 @@ use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Sanctum\HasApiTokens;
 
 /**
  * @property int $id
@@ -33,7 +37,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
+    use HasApiTokens, HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
     /**
      * Get the attributes that should be cast.
@@ -46,6 +50,35 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * @return HasMany<Shop, $this>
+     */
+    public function shops(): HasMany
+    {
+        return $this->hasMany(Shop::class);
+    }
+
+    /**
+     * @return HasMany<LegalText, $this>
+     */
+    public function legalTexts(): HasMany
+    {
+        return $this->hasMany(LegalText::class);
+    }
+
+    /**
+     * @return HasManyThrough<Delivery, Shop, $this>
+     */
+    public function deliveries(): HasManyThrough
+    {
+        return $this->hasManyThrough(Delivery::class, Shop::class);
+    }
+
+    public function legalText(LegalTextType $type): LegalText
+    {
+        return $this->legalTexts()->firstOrCreate(['type' => $type]);
     }
 
     /**
