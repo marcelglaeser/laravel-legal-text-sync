@@ -14,3 +14,9 @@ test('authenticated users can visit the dashboard', function () {
     $response = $this->get(route('dashboard'));
     $response->assertOk();
 });
+
+test('email verification is not required in this demo', function () {
+    $this->actingAs(User::factory()->unverified()->create())
+        ->get(route('dashboard'))
+        ->assertOk();
+});
