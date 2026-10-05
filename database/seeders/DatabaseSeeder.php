@@ -12,9 +12,10 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        $merchant = User::factory()->create([
+        $merchant = User::create([
             'name' => 'Musterhändler GmbH',
             'email' => 'demo@example.com',
+            'password' => 'password',
         ]);
 
         $merchant->shops()->createMany([
