@@ -7,6 +7,29 @@
 
         <x-passkey-verify />
 
+        @if (app()->environment('local'))
+            <flux:callout icon="key" data-test="demo-accounts">
+                <flux:callout.heading>{{ __('Demo access') }}</flux:callout.heading>
+                <flux:callout.text>{{ __('Accounts created by the database seeder. Only shown in the local environment.') }}</flux:callout.text>
+
+                <div class="mt-2 flex flex-wrap gap-2">
+                    @foreach (['merchant' => __('Log in as merchant'), 'admin' => __('Log in as legal department')] as $role => $label)
+                        @php($account = \Database\Seeders\DatabaseSeeder::DEMO_ACCOUNTS[$role])
+
+                        <form method="POST" action="{{ route('login.store') }}">
+                            @csrf
+                            <input type="hidden" name="email" value="{{ $account['email'] }}">
+                            <input type="hidden" name="password" value="{{ $account['password'] }}">
+
+                            <flux:button type="submit" size="sm" icon="arrow-right-end-on-rectangle">
+                                {{ $label }}
+                            </flux:button>
+                        </form>
+                    @endforeach
+                </div>
+            </flux:callout>
+        @endif
+
         <form method="POST" action="{{ route('login.store') }}" class="flex flex-col gap-6">
             @csrf
 

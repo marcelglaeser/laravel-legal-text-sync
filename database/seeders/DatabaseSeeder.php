@@ -12,18 +12,21 @@ use Illuminate\Support\Str;
 
 class DatabaseSeeder extends Seeder
 {
+    public const DEMO_ACCOUNTS = [
+        'merchant' => ['email' => 'demo@example.com', 'password' => 'password'],
+        'admin' => ['email' => 'admin@example.com', 'password' => 'password'],
+    ];
+
     public function run(LegalTextGenerator $generator): void
     {
         User::create([
             'name' => 'Rechtsabteilung',
-            'email' => 'admin@example.com',
-            'password' => 'password',
+            ...self::DEMO_ACCOUNTS['admin'],
         ])->forceFill(['is_admin' => true])->save();
 
         $merchant = User::create([
             'name' => 'Max Mustermann',
-            'email' => 'demo@example.com',
-            'password' => 'password',
+            ...self::DEMO_ACCOUNTS['merchant'],
         ]);
 
         $profile = $merchant->merchantProfile()->create([
