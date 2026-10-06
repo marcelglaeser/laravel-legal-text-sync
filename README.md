@@ -9,6 +9,7 @@ Lokal in zwei Minuten startklar (siehe unten). Demo-Logins aus dem Seeder: Händ
 - Laravel 13, PHP 8.4
 - Livewire 4, Alpine.js, Flux UI (freie Komponenten), Tailwind CSS 4 – auf Basis des offiziellen Livewire Starter Kits
 - Queues mit Database-Treiber
+- Oberfläche auf Deutsch über Laravels Lokalisierung (`lang/de.json`, Laravels eigene Texte aus `laravel-lang`), Code und API auf Englisch
 - Sanctum für die Partner-API, OpenAPI-Doku via [Scramble](https://scramble.dedoc.co)
 - Pest, Larastan (Level 8), Pint
 - GitHub Actions: Pint, Larastan und Pest (gegen SQLite **und** PostgreSQL) bei jedem Push
@@ -39,7 +40,7 @@ composer test
 
 ## Beispiel-API-Aufruf
 
-Token unter *Settings → API tokens* erzeugen, dann:
+Token unter *Einstellungen → API-Tokens* erzeugen, dann:
 
 ```bash
 curl -H "Authorization: Bearer <token>" -H "Accept: application/json" \
