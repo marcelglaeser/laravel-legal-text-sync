@@ -1,5 +1,7 @@
 # Legal Text Sync
 
+[![CI](https://github.com/marcelglaeser/laravel-legal-text-sync/actions/workflows/tests.yml/badge.svg)](https://github.com/marcelglaeser/laravel-legal-text-sync/actions/workflows/tests.yml)
+
 Ein kleines Laravel-Demo-Projekt nach dem Vorbild eines Rechtstexte-Update-Service: Die Rechtsabteilung pflegt zentrale Vorlagen für Impressum, AGB, Datenschutzerklärung und Widerrufsbelehrung. Aus Vorlage und Stammdaten des Händlers entstehen dessen persönliche Rechtstexte. Ändert sich eine Vorlage (z. B. nach einer Gesetzesänderung), werden die Texte aller Händler neu erzeugt und automatisch an ihre Shops verteilt – Shopify, JTL-Shop oder ein beliebiger Shop per signiertem Webhook. Händler können optional verlangen, jede neue Fassung vorher freizugeben. Partner rufen die aktuellen Texte über eine REST-API ab.
 
 Lokal in zwei Minuten startklar (siehe unten). Demo-Logins aus dem Seeder: Händler `demo@example.com` / `password`, Rechtsabteilung `admin@example.com` / `password`. API-Doku unter `/docs/api`.
