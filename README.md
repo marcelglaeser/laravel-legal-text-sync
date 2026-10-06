@@ -116,14 +116,6 @@ LegalTextVersion::publish()                 atomar, ebenso
 
 **Mandantentrennung:** Händler = User. Alle Abfragen laufen über die Relationen des eingeloggten Users (`$user->shops()`, `$user->legalTexts()`); Aktionen mit IDs vom Client prüfen zusätzlich Policies. Für mehrere Benutzer pro Händler wäre der nächste Schritt ein Team-Modell.
 
-## Von Symfony zu Laravel
-
-- **Messenger → Queues:** Statt Message + Handler + Transport-Routing gibt es Jobs, die sich selbst beschreiben: `$tries`, `backoff()` und `failed()` stehen direkt an der Klasse. Events mit `ShouldQueue`-Listenern ersetzen asynchrone Event-Subscriber; Listener werden automatisch entdeckt.
-- **Doctrine → Eloquent:** Active Record statt Data Mapper. Domänenlogik wie `publish()` oder `retry()` liegt direkt am Model, Relationen sind Methoden, Casts übernehmen Enums und Verschlüsselung (`'secret' => 'encrypted'`). Migrationen schreibe ich von Hand, statt sie aus Entity-Diffs zu generieren.
-- **Twig → Livewire/Blade:** Statt Controller + Formular-Typ + Twig-Template steckt eine interaktive Seite in einer einzigen Livewire-Komponente; Polling (`wire:poll`) und Aktionen (`wire:click`) brauchen kein eigenes JavaScript. Formularlogik liegt in Livewire-Form-Objekten.
-- **Voter → Policies und Gates:** Eine Policy pro Model mit einer Methode pro Fähigkeit, automatisch über Namenskonventionen gefunden und per `$this->authorize('approve', $version)` geprüft. Für modellunabhängige Rechte wie den Admin-Bereich reicht ein Gate (`can:manage-templates` als Route-Middleware).
-- **Services/DI-Konfiguration → Container ohne YAML:** Autowiring ist da, aber kaum Konfiguration nötig. Contextual Attributes wie `#[CurrentUser]` injizieren den eingeloggten Benutzer direkt in Controller-Methoden.
-
 ## Projektstruktur
 
 | Pfad | Inhalt |
@@ -141,4 +133,4 @@ LegalTextVersion::publish()                 atomar, ebenso
 
 ---
 
-Umgesetzt mit Unterstützung von KI-Werkzeugen ([Claude Code](https://claude.com/claude-code)). Fachmodell, Architekturentscheidungen und Code-Review stammen von mir.
+Umgesetzt mit Unterstützung von KI-Werkzeugen ([Claude Code](https://claude.com/claude-code)). Anforderungen, fachliche Entscheidungen und Code-Review stammen von mir.
