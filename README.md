@@ -140,4 +140,4 @@ LegalTextVersion::publish()                 atomar, ebenso
 
 ---
 
-Dieses Projekt wurde mit [Claude Code](https://claude.com/claude-code) entwickelt.
+Umgesetzt mit Unterstützung von KI-Werkzeugen ([Claude Code](https://claude.com/claude-code)). Fachmodell, Architekturentscheidungen und Code-Review stammen von mir.
