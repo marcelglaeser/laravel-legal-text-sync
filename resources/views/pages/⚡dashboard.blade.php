@@ -51,7 +51,7 @@ new #[Title('Dashboard')] class extends Component {
     <div class="grid gap-4 sm:grid-cols-3">
         @foreach (\App\Enums\DeliveryStatus::cases() as $status)
             <flux:card class="flex items-center justify-between">
-                <flux:text>{{ ucfirst($status->value) }}</flux:text>
+                <flux:text>{{ $status->label() }}</flux:text>
                 <flux:badge :color="$status->color()" size="lg">{{ $this->counts[$status->value] }}</flux:badge>
             </flux:card>
         @endforeach
@@ -89,10 +89,10 @@ new #[Title('Dashboard')] class extends Component {
                         <flux:table.cell>
                             @if ($delivery->last_error)
                                 <flux:tooltip :content="$delivery->last_error">
-                                    <flux:badge :color="$delivery->status->color()" size="sm" inset="top bottom">{{ $delivery->status->value }}</flux:badge>
+                                    <flux:badge :color="$delivery->status->color()" size="sm" inset="top bottom">{{ $delivery->status->label() }}</flux:badge>
                                 </flux:tooltip>
                             @else
-                                <flux:badge :color="$delivery->status->color()" size="sm" inset="top bottom">{{ $delivery->status->value }}</flux:badge>
+                                <flux:badge :color="$delivery->status->color()" size="sm" inset="top bottom">{{ $delivery->status->label() }}</flux:badge>
                             @endif
                         </flux:table.cell>
                         <flux:table.cell>{{ $delivery->attempts }}</flux:table.cell>

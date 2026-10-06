@@ -16,6 +16,7 @@ test('shows the deliveries of the merchant and polls for updates', function () {
     Livewire::actingAs($user)
         ->test('pages::dashboard')
         ->assertSee('Mein Shop')
+        ->assertSee('Fehlgeschlagen')
         ->assertDontSee('Fremder Shop')
         ->assertSeeHtml('wire:poll.5s');
 });

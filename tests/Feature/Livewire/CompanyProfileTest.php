@@ -48,3 +48,11 @@ test('the approval setting is stored with the profile', function () {
 
     expect($user->fresh()?->merchantProfile?->requires_approval)->toBeTrue();
 });
+
+test('validation messages use german field names', function () {
+    $component = Livewire::actingAs(User::factory()->create())
+        ->test('pages::company-profile')
+        ->call('save');
+
+    expect($component->errors()->first('form.companyName'))->toContain('Firmenname');
+});

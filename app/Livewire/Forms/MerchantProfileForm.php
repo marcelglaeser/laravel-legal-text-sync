@@ -53,6 +53,22 @@ class MerchantProfileForm extends Form
     }
 
     /**
+     * @return array<string, string>
+     */
+    protected function validationAttributes(): array
+    {
+        return [
+            'companyName' => __('Company name'),
+            'representative' => __('Represented by'),
+            'street' => __('Street'),
+            'postalCode' => __('Postal code'),
+            'city' => __('City'),
+            'email' => __('Contact email'),
+            'vatId' => __('VAT ID'),
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     protected function rules(): array

@@ -13,8 +13,8 @@ class PublicUrl implements ValidationRule
     {
         try {
             PublicEndpoint::resolve(is_string($value) ? $value : '');
-        } catch (UnsafeEndpointException $exception) {
-            $fail($exception->getMessage());
+        } catch (UnsafeEndpointException) {
+            $fail(__('The URL must point to a publicly reachable address.'));
         }
     }
 }

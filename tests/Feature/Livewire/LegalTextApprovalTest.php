@@ -15,7 +15,7 @@ test('a merchant approves a pending version, which publishes it', function () {
 
     Livewire::actingAs($profile->user)
         ->test('pages::legal-texts.show', ['type' => LegalTextType::Imprint])
-        ->assertSee('waiting for your approval')
+        ->assertSee('wartet auf Ihre Freigabe')
         ->call('approve', $version->id)
         ->assertOk();
 

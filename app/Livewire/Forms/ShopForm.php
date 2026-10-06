@@ -73,6 +73,19 @@ class ShopForm extends Form
     }
 
     /**
+     * @return array<string, string>
+     */
+    protected function validationAttributes(): array
+    {
+        return [
+            'name' => __('Name'),
+            'type' => __('Type'),
+            'endpointUrl' => __('Endpoint URL'),
+            'secret' => __('Signing secret'),
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     protected function rules(): array
